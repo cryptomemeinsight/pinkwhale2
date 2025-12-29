@@ -419,9 +419,10 @@ function App() {
                             setLoadingStats(true);
                             setReloadKey((k) => k + 1);
                           }}
-                          className="px-3 py-2 rounded-xl bg-pinkwhale-pink/20 hover:bg-pinkwhale-pink/30 border border-pinkwhale-pink/40 text-xs font-mono text-white"
+                          className="px-3 py-2 rounded-xl bg-pinkwhale-pink/20 hover:bg-pinkwhale-pink/30 border border-pinkwhale-pink/40 text-xs font-mono text-white flex items-center justify-center"
                         >
-                          Refresh
+                          <span className="md:hidden"><Repeat size={16} /></span>
+                          <span className="hidden md:inline">Refresh</span>
                         </button>
                       </div>
                     </div>
