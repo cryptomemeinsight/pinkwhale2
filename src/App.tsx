@@ -257,6 +257,49 @@ function App() {
             </div>
         </div>
 
+        {/* Global Impact & Awareness Section */}
+        <section className="w-full mb-24 animate-in fade-in slide-in-from-bottom-8 duration-700">
+            <div className="glass-panel rounded-3xl p-8 md:p-12 relative overflow-hidden border border-white/10">
+                <div className="grid md:grid-cols-2 gap-12 items-center relative z-10">
+                    <div>
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-pinkwhale-pink/10 border border-pinkwhale-pink/20 mb-6">
+                            <span className="w-2 h-2 rounded-full bg-pinkwhale-pink animate-pulse"></span>
+                            <span className="text-[11px] font-mono text-pinkwhale-pink tracking-wider">GLOBAL IMPACT 2025</span>
+                        </div>
+                        <h2 className="text-3xl md:text-4xl font-display mb-6 leading-tight">
+                            Breast cancer remains the <span className="text-pinkwhale-pink">most common cancer</span> in women worldwide.
+                        </h2>
+                        <p className="text-gray-400 leading-relaxed text-lg mb-6">
+                            In 2025, over <span className="text-white font-bold">316,000 women in the U.S.</span> are estimated to receive new invasive breast cancer diagnoses, with around <span className="text-white font-bold">2.3 million new cases</span> expected globally.
+                        </p>
+                        <p className="text-gray-500 text-sm italic border-l-2 border-white/10 pl-4">
+                            "Though exact global numbers for 2025 are projections, numbers are rising by mid-century."
+                        </p>
+                    </div>
+
+                    {/* Image Slider Marquee */}
+                    <div className="relative h-64 md:h-80 w-full overflow-hidden rounded-2xl bg-black/40 border border-white/5">
+                        {/* Gradient Vignette Overlays */}
+                        <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-[#0a0a1a] to-transparent z-10 pointer-events-none" />
+                        <div className="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-[#0a0a1a] to-transparent z-10 pointer-events-none" />
+                        
+                        <div className="flex gap-4 absolute top-0 left-0 h-full animate-marquee hover:[animation-play-state:paused] w-[200%]">
+                            {[1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 6].map((num, i) => (
+                                <div key={i} className="h-full flex-shrink-0 w-1/3 md:w-1/3 relative group">
+                                    <img 
+                                        src={`/cancer${num}.jpg`} 
+                                        alt={`Cancer Awareness ${num}`} 
+                                        className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity duration-500 grayscale group-hover:grayscale-0"
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         {/* Main Grid Layout */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 w-full mb-24">
             
