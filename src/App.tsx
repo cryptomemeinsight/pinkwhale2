@@ -3,13 +3,12 @@ import Lenis from 'lenis';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import { OnlinePumpSdk, PUMP_PROGRAM_ID, creatorVaultPda } from '@pump-fun/pump-sdk';
+import { OnlinePumpSdk, creatorVaultPda } from '@pump-fun/pump-sdk';
 import { Copy, Check, Search, Flame, Coins, Infinity, AlertTriangle, ExternalLink, Zap, Repeat } from 'lucide-react';
 
 // Constants
 const TOKEN_MINT_ADDRESS = "BgLBeZz9SnHgLVHobQWsgdrjTSnW2mbtqJfMokEvpump"; 
 const CREATOR_WALLET_ADDRESS = "3K2bFxQp5s7FgmXHbFvzgunLRzDnUL7vTVbwQAAWX3yr";
-const BITQUERY_ENDPOINT = "https://asia.streaming.bitquery.io/graphql";
 const ELIGIBLE_PERCENTAGE = 0.5;
 const INITIAL_SUPPLY = 1_000_000_000; // 1 Billion
 
