@@ -22,6 +22,7 @@ export default {
         'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'float': 'float 6s ease-in-out infinite',
         'glow': 'glow 2s ease-in-out infinite alternate',
+        'tilt': 'tilt 2s ease-in-out infinite',
       },
       keyframes: {
         float: {
@@ -31,6 +32,10 @@ export default {
         glow: {
           'from': { boxShadow: '0 0 10px #ff00aa, 0 0 20px #ff00aa' },
           'to': { boxShadow: '0 0 20px #ff00aa, 0 0 30px #ff00aa' },
+        },
+        tilt: {
+          '0%, 100%': { transform: 'rotate(-10deg)' },
+          '50%': { transform: 'rotate(10deg)' },
         }
       }
     },
