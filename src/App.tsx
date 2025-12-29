@@ -184,7 +184,7 @@ function App() {
   const isEligible = balance !== null && (balance / INITIAL_SUPPLY) * 100 >= ELIGIBLE_PERCENTAGE;
 
   return (
-    <div className="min-h-screen flex flex-col items-center">
+    <div className="min-h-screen flex flex-col items-center overflow-x-hidden">
       
       {/* Dynamic Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
@@ -426,7 +426,11 @@ function App() {
         </section>
 
         <section className="w-full mb-24 animate-in fade-in slide-in-from-bottom-8 duration-700">
-          <h2 className="text-center text-4xl font-display mb-12">Recent Donations</h2>
+          <h2 className="text-center text-4xl font-display mb-12 flex items-center justify-center gap-4">
+            <img src="/pink_ribbon.png" alt="Pink Ribbon" className="w-12 h-12 object-contain animate-tilt" />
+            Recent Donations
+            <img src="/pink_ribbon.png" alt="Pink Ribbon" className="w-12 h-12 object-contain animate-tilt" />
+          </h2>
           <div className="glass-panel rounded-3xl p-6 border border-white/10">
             <div className="mb-4">
               <input
@@ -443,36 +447,60 @@ function App() {
               <p className="text-center text-gray-500">No transactions found.</p>
             ) : (
               <div className="divide-y divide-white/5">
-                {(searchQuery
-                  ? recentTxs.filter((t) => {
-                      const q = searchQuery.trim().toLowerCase();
-                      const num = parseFloat(q);
-                      if (!Number.isNaN(num)) {
-                        const s1 = t.amount.toString();
-                        const s2 = t.amount.toFixed(9);
-                        return s1.includes(q) || s2.includes(q);
-                      }
-                      const cp = (t.counterparty || '').toLowerCase();
-                      return cp.includes(q) || t.signature.toLowerCase().includes(q);
-                    })
-                  : recentTxs
-                ).map((t) => (
-                  <div key={t.signature} className="py-4 flex items-center justify-between">
-                    <div className={`px-3 py-1 rounded-full text-xs font-mono ${t.direction === 'IN' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                      {t.direction}
-                    </div>
-                    <div className="flex-1 px-4">
-                      <div className="text-white font-display text-lg">{t.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })} SOL</div>
-                      <div className="text-xs text-gray-500 font-mono">
-                        {t.counterparty ? `Counterparty: ${t.counterparty}` : 'Counterparty: Unknown'}
+                {recentTxs
+                  .filter((t) => t.amount > 0.10)
+                  .filter((t) => {
+                    if (!searchQuery) return true;
+                    const q = searchQuery.trim().toLowerCase();
+                    const num = parseFloat(q);
+                    if (!Number.isNaN(num)) {
+                      const s1 = t.amount.toString();
+                      const s2 = t.amount.toFixed(9);
+                      return s1.includes(q) || s2.includes(q);
+                    }
+                    const cp = (t.counterparty || '').toLowerCase();
+                    return cp.includes(q) || t.signature.toLowerCase().includes(q);
+                  })
+                  .map((t) => (
+                  <div key={t.signature} className="py-4 border-b border-white/5 last:border-0">
+                    {/* Desktop Layout */}
+                    <div className="hidden md:flex items-center justify-between">
+                      <div className={`px-3 py-1 rounded-full text-xs font-mono ${t.direction === 'IN' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                        {t.direction}
+                      </div>
+                      <div className="flex-1 px-4">
+                        <div className="text-white font-display text-lg">{t.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })} SOL</div>
+                        <div className="text-xs text-gray-500 font-mono">
+                          {t.counterparty ? `Counterparty: ${t.counterparty}` : 'Counterparty: Unknown'}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-gray-400 font-mono">{t.time ? new Date(t.time * 1000).toLocaleString() : 'Unknown time'}</div>
+                        <a href={`https://solscan.io/tx/${t.signature}`} target="_blank" className="text-pinkwhale-cyan text-xs font-mono hover:underline inline-flex items-center gap-1">
+                          View
+                          <ExternalLink size={12} />
+                        </a>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-xs text-gray-400 font-mono">{t.time ? new Date(t.time * 1000).toLocaleString() : 'Unknown time'}</div>
-                      <a href={`https://solscan.io/tx/${t.signature}`} target="_blank" className="text-pinkwhale-cyan text-xs font-mono hover:underline inline-flex items-center gap-1">
-                        View
-                        <ExternalLink size={12} />
-                      </a>
+
+                    {/* Mobile Layout */}
+                    <div className="md:hidden flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <div className={`px-3 py-1 rounded-full text-xs font-mono ${t.direction === 'IN' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                          {t.direction}
+                        </div>
+                        <div className="text-white font-display text-lg">{t.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })} SOL</div>
+                      </div>
+                      <div className="text-xs text-gray-500 font-mono break-all">
+                        {t.counterparty ? `Counterparty: ${t.counterparty}` : 'Counterparty: Unknown'}
+                      </div>
+                      <div className="flex items-center justify-between pt-2 border-t border-white/5 mt-1">
+                        <div className="text-xs text-gray-400 font-mono">{t.time ? new Date(t.time * 1000).toLocaleString() : 'Unknown time'}</div>
+                        <a href={`https://solscan.io/tx/${t.signature}`} target="_blank" className="text-pinkwhale-cyan text-xs font-mono hover:underline inline-flex items-center gap-1">
+                          View
+                          <ExternalLink size={12} />
+                        </a>
+                      </div>
                     </div>
                   </div>
                 ))}
