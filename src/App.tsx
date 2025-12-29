@@ -3,6 +3,7 @@ import Lenis from 'lenis';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { OnlinePumpSdk, PUMP_PROGRAM_ID, creatorVaultPda } from '@pump-fun/pump-sdk';
 import { Copy, Check, Search, Flame, Coins, Infinity, AlertTriangle, ExternalLink, Zap, Repeat } from 'lucide-react';
 
 // Constants
@@ -30,6 +31,7 @@ function App() {
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [rotation, setRotation] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isHovered) setIsHovered(true);
@@ -82,34 +84,82 @@ function App() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
+        const sdk = new OnlinePumpSdk(connection);
         const creatorPubKey = new PublicKey(CREATOR_WALLET_ADDRESS);
-        const signatures = await connection.getSignaturesForAddress(creatorPubKey, { limit: 1000 });
-        let totalIncomingLamports = 0;
-        setTotalCreatorFees(0);
-        for (const sig of signatures) {
-          try {
-            const tx = await connection.getParsedTransaction(sig.signature, { maxSupportedTransactionVersion: 0 });
-            if (!tx || !tx.meta) continue;
-            const allInstructions = [
-              ...tx.transaction.message.instructions,
-              ...(tx.meta.innerInstructions?.flatMap((i: any) => i.instructions) || [])
-            ];
-            for (const ix of allInstructions) {
-              if ('parsed' in ix && ix.program === 'system' && ix.parsed.type === 'transfer') {
-                const { destination, lamports } = ix.parsed.info;
-                if (destination === CREATOR_WALLET_ADDRESS) {
-                  totalIncomingLamports += lamports;
-                  setTotalCreatorFees((prev) => prev + lamports / LAMPORTS_PER_SOL);
-                }
-              }
-            }
-            await new Promise((r) => setTimeout(r, 20));
-          } catch {}
+        
+        // 1. Fetch Current Unclaimed Fees
+        // Wrap in try/catch to prevent whole app crash if SDK fails
+        let currentUnclaimedSol = 0;
+        try {
+             const feesLamports = await sdk.getCreatorVaultBalanceBothPrograms(creatorPubKey);
+             currentUnclaimedSol = Number(feesLamports) / LAMPORTS_PER_SOL;
+        } catch (e) {
+            console.error("Failed to fetch unclaimed fees:", e);
         }
+
+        // UNBLOCK UI IMMEDIATELY
+        // Show at least the unclaimed amount while we scan history
+        setTotalCreatorFees(currentUnclaimedSol);
+        setLoadingStats(false); 
         setLastUpdated(Date.now());
-      } catch {
-        setTotalCreatorFees(0);
-      } finally {
+        
+        // 2. Calculate Total Lifetime Fees (Unclaimed + Claimed)
+        let totalClaimedSol = 0;
+        setIsScanning(true);
+        try {
+            // creatorVaultPda takes CREATOR address, not MINT
+            const vaultPda = creatorVaultPda(creatorPubKey);
+
+            // Fetch transaction history for the vault to find withdrawals (claims)
+            // We look for transfers FROM the vault TO the creator
+            // Increasing limit to 1000 to catch older claims
+            const signatures = await connection.getSignaturesForAddress(vaultPda, { limit: 1000 });
+            
+            // Fetch individually to avoid 403 Batch Error
+            // We'll process them in small groups to manage rate limits manually
+            for (let i = 0; i < signatures.length; i++) {
+                const sigInfo = signatures[i];
+                
+                try {
+                    const tx = await connection.getParsedTransaction(sigInfo.signature, { maxSupportedTransactionVersion: 0 });
+                    
+                    if (tx && tx.meta && !tx.meta.err) {
+                        // Check inner instructions for transfers from Vault -> Creator
+                        if (tx.meta.innerInstructions) {
+                            tx.meta.innerInstructions.forEach(inner => {
+                                inner.instructions.forEach(inst => {
+                                    if ('parsed' in inst && inst.parsed.type === 'transfer') {
+                                        const info = inst.parsed.info;
+                                        if (info.source === vaultPda.toBase58() && info.destination === creatorPubKey.toBase58()) {
+                                            const amount = info.lamports / LAMPORTS_PER_SOL;
+                                            totalClaimedSol += amount;
+                                            
+                                            // Update state LIVE as we find claims
+                                            setTotalCreatorFees(prev => prev + amount);
+                                        }
+                                    }
+                                });
+                            });
+                        }
+                    }
+                } catch (e) {
+                    console.warn(`Skipped tx ${sigInfo.signature}:`, e);
+                }
+
+                // Small delay to prevent 429
+                await new Promise(r => setTimeout(r, 100));
+            }
+        } catch (e) {
+            console.error("Failed to fetch claim history:", e);
+        } finally {
+            setIsScanning(false);
+        }
+        
+        // Final update to be sure
+        setTotalCreatorFees(currentUnclaimedSol + totalClaimedSol);
+        setLastUpdated(Date.now());
+      } catch (err) {
+        console.error("Error fetching fees:", err);
         setLoadingStats(false);
       }
     };
@@ -289,7 +339,7 @@ function App() {
                     {loadingStats ? (
                         <span className="animate-pulse">LOADING...</span>
                     ) : (
-                        `${totalCreatorFees.toLocaleString(undefined, { maximumFractionDigits: 2 })} SOL RAISED FOR DONATION`
+                        `${totalCreatorFees.toLocaleString(undefined, { maximumFractionDigits: 4 })} SOL ACCUMULATED FEES`
                     )}
                 </span>
             </div>
@@ -411,59 +461,59 @@ function App() {
             {/* Right Col: Stats (Span 5) */}
             <div className="md:col-span-5 flex flex-col gap-6 animate-in fade-in slide-in-from-right-8 duration-700 delay-500">
                 
-                {/* Donation Pool Stat */}
+                {/* Accumulated Creator Fees Section (Pump.fun) */}
                 <div className="relative overflow-hidden rounded-3xl flex-1 group hover:-translate-y-1 transition-transform duration-300">
-                  <div className="absolute inset-0 bg-gradient-to-tr from-pinkwhale-pink/20 via-transparent to-pinkwhale-cyan/25" />
-                  <div className="absolute -bottom-24 -left-24 w-96 h-96 rounded-full bg-pinkwhale-pink/10 blur-3xl" />
-                  <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-pinkwhale-cyan/10 blur-3xl" />
-                  <div className="relative glass-panel rounded-3xl p-10 border border-white/10 min-h-[340px] md:min-h-[420px]">
-                    <div className="flex items-center justify-between">
-                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
-                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                        <span className="text-[11px] font-mono text-gray-300 tracking-wider">TOTAL DONATION POOL</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="text-pinkwhale-cyan opacity-60">
-                          <Flame size={22} />
-                        </div>
-                        <a href={`https://solscan.io/account/${CREATOR_WALLET_ADDRESS}`} target="_blank" className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-gray-300 inline-flex items-center gap-2">
-                          Wallet
-                          <ExternalLink size={12} />
-                        </a>
-                      </div>
-                    </div>
-                    <div className="mt-6">
+                  <div className="absolute inset-0 bg-[#1a1a2e]/90 backdrop-blur-xl" />
+                  <div className="absolute -bottom-24 -left-24 w-96 h-96 rounded-full bg-pinkwhale-pink/5 blur-3xl" />
+                  <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-pinkwhale-cyan/5 blur-3xl" />
+                  
+                  <div className="relative p-10 border border-[#16213e] rounded-3xl min-h-[340px] md:min-h-[420px] flex flex-col items-center justify-center text-center">
+                    
+                    <div className="flex items-center gap-3 mb-2">
+                    <Coins className="w-5 h-5 text-pink-400" />
+                    <h3 className="text-2xl md:text-3xl font-display text-white mb-0">Donation Pool (Creator Fees)</h3>
+                </div>
+                <div className="w-16 h-1 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full mb-8"></div>
+                    
+                    <div className="mb-6">
                       {loadingStats ? (
-                        <div className="h-14 w-48 bg-white/10 rounded animate-pulse" />
+                        <div className="h-20 w-64 bg-white/5 rounded animate-pulse mx-auto" />
                       ) : (
-                        <div className="text-6xl md:text-7xl font-display text-transparent bg-clip-text bg-gradient-to-r from-white via-pinkwhale-cyan to-white drop-shadow-[0_0_20px_rgba(0,255,255,0.25)]">
-                          {totalCreatorFees.toLocaleString(undefined, { maximumFractionDigits: 2 })} SOL
+                        <div className="flex flex-col items-center justify-center gap-2">
+                            <div className="text-4xl sm:text-5xl md:text-6xl font-bold text-[#00ff9d] drop-shadow-[0_0_20px_rgba(0,255,157,0.25)] flex flex-wrap items-center justify-center gap-2 break-all">
+                              {totalCreatorFees.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[#14f195]">SOL</span>
+                            </div>
+                            {isScanning && (
+                                <div className="flex items-center gap-2 text-xs md:text-sm text-[#00ff9d]/70 font-mono animate-pulse">
+                                    <div className="w-3 h-3 border-2 border-[#00ff9d]/30 border-t-[#00ff9d] rounded-full animate-spin"></div>
+                                    <span>SCANNING HISTORY...</span>
+                                </div>
+                            )}
                         </div>
                       )}
-                      <div className="mt-2 text-xs text-gray-400">Raised for cancer patients</div>
                     </div>
-                    <div className="mt-8 grid grid-cols-2 md:grid-cols-2 gap-3">
-                      <div className="rounded-xl bg-white/5 border border-white/10 p-4">
-                        <div className="text-[11px] font-mono text-gray-400 mb-1">Last Updated</div>
-                        <div className="text-xl font-display text-white">{lastUpdated ? new Date(lastUpdated).toLocaleTimeString() : '—'}</div>
-                      </div>
-                      <div className="rounded-xl bg-white/5 border border-white/10 p-4 flex items-center justify-between">
-                        <div>
-                          <div className="text-[11px] font-mono text-gray-400 mb-1">Actions</div>
-                          <div className="text-xs text-gray-500">Refresh totals</div>
+
+                    <p className="text-sm md:text-base text-gray-400 max-w-md mx-auto mb-8 font-mono">
+                      Fees earned from on Pump Fun
+                    </p>
+
+                    <div className="flex gap-3">
+                        <div className="rounded-xl bg-white/5 border border-white/10 px-4 py-2 flex flex-col items-center">
+                            <div className="text-[10px] font-mono text-gray-500 mb-1">Last Updated</div>
+                            <div className="text-sm font-display text-white">{lastUpdated ? new Date(lastUpdated).toLocaleTimeString() : '—'}</div>
                         </div>
-                        <button
+                         <button
                           onClick={() => {
                             setLoadingStats(true);
                             setReloadKey((k) => k + 1);
                           }}
-                          className="px-3 py-2 rounded-xl bg-pinkwhale-pink/20 hover:bg-pinkwhale-pink/30 border border-pinkwhale-pink/40 text-xs font-mono text-white flex items-center justify-center"
+                          className="px-6 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-white flex items-center justify-center gap-2 transition-colors"
                         >
-                          <span className="md:hidden"><Repeat size={16} /></span>
-                          <span className="hidden md:inline">Refresh</span>
+                          <Repeat size={16} />
+                          <span>Refresh</span>
                         </button>
-                      </div>
                     </div>
+
                   </div>
                 </div>
 
