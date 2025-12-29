@@ -28,6 +28,32 @@ function App() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [reloadKey, setReloadKey] = useState<number>(0);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+  const [rotation, setRotation] = useState({ x: 0, y: 0 });
+  const [isHovered, setIsHovered] = useState(false);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isHovered) setIsHovered(true);
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Calculate percentage from center (-1 to 1)
+    const xPct = (x / rect.width - 0.5) * 2;
+    const yPct = (y / rect.height - 0.5) * 2;
+
+    // Calculate rotation (max 15 degrees) to "look at" the cursor
+    // rotateX: negative brings top forward (when mouse is at top)
+    // rotateY: negative brings left forward (when mouse is at left)
+    const rotateX = yPct * 15;
+    const rotateY = xPct * 15;
+
+    setRotation({ x: rotateX, y: rotateY });
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    setRotation({ x: 0, y: 0 });
+  };
 
   // Initialize Lenis Smooth Scroll
   useEffect(() => {
@@ -214,8 +240,20 @@ function App() {
              <span className="text-xs font-mono text-gray-300 tracking-wider">LIVE ON SOLANA MAINNET</span>
           </div>
 
-          <div className="mb-0 animate-in fade-in zoom-in duration-700 delay-100">
-              <img src="/main_img2.gif" alt="Pink Whale" className="w-72 md:w-[500px] mx-auto object-contain drop-shadow-[0_0_30px_rgba(255,0,170,0.4)]" />
+          <div 
+            className="mb-0 animate-in fade-in zoom-in duration-700 delay-100 perspective-1000"
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+          >
+              <img 
+                src="/main_img2.gif" 
+                alt="Pink Whale" 
+                className="w-72 md:w-[500px] mx-auto object-contain drop-shadow-[0_0_30px_rgba(255,0,170,0.4)] transition-transform duration-100 ease-out" 
+                style={{ 
+                  transformStyle: 'preserve-3d',
+                  transform: `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg) scale3d(${isHovered ? 1.1 : 1}, ${isHovered ? 1.1 : 1}, 1)`
+                }}
+              />
           </div>
 
           <h1 className="text-7xl md:text-9xl font-display font-black tracking-tighter text-white mb-2 leading-[0.9] neon-text animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
